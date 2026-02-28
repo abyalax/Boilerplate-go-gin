@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: boilerplate_go_gin_postgres
+    environment:
+      POSTGRES_USER: boilerplate_go_gin
+      POSTGRES_PASSWORD: boilerplate_go_gin
+      POSTGRES_DB: db_boilerplate_go_gin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U boilerplate_go_gin -d db_boilerplate_go_gin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer
+    container_name: boilerplate_go_gin_adminer
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:

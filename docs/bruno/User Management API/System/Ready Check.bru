@@ -1,0 +1,32 @@
+meta {
+  name: Ready Check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{api_url}}/ready
+}
+
+docs {
+  # Ready Check
+  
+  Checks if the API is ready to serve requests. Verifies that the database connection is active.
+  
+  ## Request
+  - **Method**: GET
+  - **Endpoint**: `/api/v1/ready`
+  
+  ## Response (200 OK)
+  ```json
+  {
+    "status": "ready"
+  }
+  ```
+  
+  ## Error Responses
+  - **503 Service Unavailable**: Database connection is not available
+  
+  ## Use Case
+  Typically used for Kubernetes liveness/readiness probes or load balancer health checks to determine if the service is ready to accept traffic.
+}

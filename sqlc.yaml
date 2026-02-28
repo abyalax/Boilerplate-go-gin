@@ -1,0 +1,17 @@
+version: "2"
+sql:
+  - schema: db/migration
+    queries: db/query/users
+    engine: postgresql
+    gen:
+      go:
+        package: "users"
+        out: "internal/users/repositories/users"
+
+  - schema: db/migration
+    queries: db/query/auth
+    engine: postgresql
+    gen:
+      go:
+        package: "auth"
+        out: "internal/auth/repositories/auth"
