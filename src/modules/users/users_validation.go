@@ -1,4 +1,4 @@
-package validation
+package users
 
 // CreateUserRequest is the request DTO for creating a user
 type CreateUserRequest struct {

@@ -7,10 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	middlewares "github.com/abyalax/Boilerplate-go-gin/internal/middleware"
-	user_handlers "github.com/abyalax/Boilerplate-go-gin/internal/users/handlers"
-	user_repositories "github.com/abyalax/Boilerplate-go-gin/internal/users/repositories/users"
-	user_services "github.com/abyalax/Boilerplate-go-gin/internal/users/services"
+	middlewares "github.com/abyalax/Boilerplate-go-gin/src/middleware"
+	"github.com/abyalax/Boilerplate-go-gin/src/modules/users"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
@@ -23,7 +21,7 @@ type App struct {
 	db     *sql.DB
 }
 
-// NewApp initializes the application
+// NewApp init the application
 func NewApp(dbURL string, port int) (*App, error) {
 	// Initialize logger
 	logger, err := initLogger()
@@ -31,27 +29,23 @@ func NewApp(dbURL string, port int) (*App, error) {
 		return nil, err
 	}
 
-	// Initialize database
+	// Init database
 	db, err := initDatabase(logger, dbURL)
 	if err != nil {
 		logger.Fatal("failed to initialize database", zap.Error(err))
 	}
 
-	// Initialize service layer
-	userQueries := user_repositories.New(db)
-	userService := user_services.NewUserService(userQueries)
-
-	// Initialize HTTP handlers
-	userHandler := user_handlers.NewUserHandler(
+	userQueries := users.New(db)                     // Initialize repository layer
+	userService := users.NewUserService(userQueries) // Initialize service layer
+	userHandler := users.NewUserHandler(             // Initialize HTTP handlers
 		userService,
 		logger,
 	)
 
-	// Initialize Gin router
+	// Init Gin router
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
-	// Add middlewares
 	router.Use(middlewares.LoggingMiddleware(logger))
 	router.Use(middlewares.RecoveryMiddleware(logger))
 	router.Use(middlewares.ErrorHandler(logger))

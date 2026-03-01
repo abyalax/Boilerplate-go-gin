@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	user_error "github.com/abyalax/Boilerplate-go-gin/internal/users/errors"
+	"github.com/abyalax/Boilerplate-go-gin/src/modules/users"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -16,7 +16,7 @@ type ErrorResponse struct {
 	Status  int    `json:"status"`
 }
 
-// ErrorHandler middleware untuk handle error dengan proper
+// ErrorHandler middleware for proper error handling
 func ErrorHandler(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
@@ -29,7 +29,7 @@ func ErrorHandler(logger *zap.Logger) gin.HandlerFunc {
 	}
 }
 
-// handleError maps domain/application errors ke HTTP response
+// handleError maps domain/application errors to HTTP response
 func handleError(c *gin.Context, logger *zap.Logger, err error) {
 	if err == nil {
 		return
@@ -37,7 +37,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 
 	// Domain errors
 	switch {
-	case errors.Is(err, user_error.ErrUserNotFound):
+	case errors.Is(err, users.ErrUserNotFound):
 		logger.Warn("user not found", zap.Error(err))
 		c.JSON(http.StatusNotFound, ErrorResponse{
 			Code:    "USER_NOT_FOUND",
@@ -45,7 +45,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusNotFound,
 		})
 
-	case errors.Is(err, user_error.ErrUserAlreadyExists):
+	case errors.Is(err, users.ErrUserAlreadyExists):
 		logger.Warn("user already exists", zap.Error(err))
 		c.JSON(http.StatusConflict, ErrorResponse{
 			Code:    "USER_ALREADY_EXISTS",
@@ -53,7 +53,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusConflict,
 		})
 
-	case errors.Is(err, user_error.ErrInvalidEmail):
+	case errors.Is(err, users.ErrInvalidEmail):
 		logger.Warn("invalid email", zap.Error(err))
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Code:    "INVALID_EMAIL",
@@ -61,7 +61,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusBadRequest,
 		})
 
-	case errors.Is(err, user_error.ErrInvalidName):
+	case errors.Is(err, users.ErrInvalidName):
 		logger.Warn("invalid name", zap.Error(err))
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Code:    "INVALID_NAME",
@@ -69,7 +69,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusBadRequest,
 		})
 
-	case errors.Is(err, user_error.ErrInvalidPassword):
+	case errors.Is(err, users.ErrInvalidPassword):
 		logger.Warn("invalid password", zap.Error(err))
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Code:    "INVALID_PASSWORD",

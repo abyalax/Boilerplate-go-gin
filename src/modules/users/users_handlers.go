@@ -1,10 +1,8 @@
-package handlers
+package users
 
 import (
 	"net/http"
 
-	"github.com/abyalax/Boilerplate-go-gin/internal/users/services"
-	"github.com/abyalax/Boilerplate-go-gin/internal/users/validation"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -16,15 +14,15 @@ type UserResponse struct {
 	Email string `json:"email"`
 }
 
-// UserHandler handles user-related HTTP requests
+// UserHandler handle user-related HTTP requests
 type UserHandler struct {
-	userService *services.UserService
+	userService *UserService
 	logger      *zap.Logger
 }
 
 // NewUserHandler creates a new UserHandler
 func NewUserHandler(
-	userService *services.UserService,
+	userService *UserService,
 	logger *zap.Logger,
 ) *UserHandler {
 	return &UserHandler{
@@ -33,9 +31,9 @@ func NewUserHandler(
 	}
 }
 
-// CreateUser handles POST /users
+// CreateUser handle POST /users
 func (h *UserHandler) CreateUser(c *gin.Context) {
-	var req validation.CreateUserRequest
+	var req CreateUserRequest
 
 	// Gin binding validation using struct tags
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -60,11 +58,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	})
 }
 
-// GetUser handles GET /users/:id
+// GetUser handle GET /users/:id
 func (h *UserHandler) GetUser(c *gin.Context) {
 	idStr := c.Param("id")
 
-	// Delegate to service (handles path parameter validation)
+	// Delegate to service (handle path parameter validation)
 	userDTO, err := h.userService.GetUser(c.Request.Context(), idStr)
 	if err != nil {
 		h.logger.Error("failed to get user", zap.Error(err), zap.String("id", idStr))
@@ -79,11 +77,11 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	})
 }
 
-// UpdateUser handles PUT /users/:id
+// UpdateUser handle PUT /users/:id
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	idStr := c.Param("id")
 
-	var req validation.UpdateUserRequest
+	var req UpdateUserRequest
 
 	// Gin binding validation using struct tags
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -108,11 +106,11 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	})
 }
 
-// DeleteUser handles DELETE /users/:id
+// DeleteUser handle DELETE /users/:id
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	idStr := c.Param("id")
 
-	// Delegate to service (handles path parameter validation)
+	// Delegate to service (handle path parameter validation)
 	err := h.userService.DeleteUser(c.Request.Context(), idStr)
 	if err != nil {
 		h.logger.Error("failed to delete user", zap.Error(err), zap.String("id", idStr))
@@ -124,7 +122,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusNoContent, nil)
 }
 
-// ListUsers handles GET /users
+// ListUsers handle GET /users
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	// Delegate to service
 	users, err := h.userService.ListUsers(c.Request.Context())

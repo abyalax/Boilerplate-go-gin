@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/abyalax/Boilerplate-go-gin/internal/bootstrap"
+	"github.com/abyalax/Boilerplate-go-gin/src/bootstrap"
 	"github.com/joho/godotenv"
 )
 

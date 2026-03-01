@@ -43,7 +43,7 @@ bruno/
 
 **Service**: User Management API  
 **Framework**: Go + Gin  
-**Base URL**: `http://localhost:8080/api/v1`
+**Base URL**: `http://localhost:4000/api/v1`
 
 ### Core Endpoints
 

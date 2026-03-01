@@ -1,4 +1,4 @@
-package services
+package users
 
 import (
 	"context"
@@ -6,30 +6,26 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-
-	user_error "github.com/abyalax/Boilerplate-go-gin/internal/users/errors"
-	users "github.com/abyalax/Boilerplate-go-gin/internal/users/repositories/users"
-	"github.com/abyalax/Boilerplate-go-gin/internal/users/validation"
 )
 
 // UserService handles all user business logic
 type UserService struct {
-	q *users.Queries
+	q *Queries
 }
 
 // NewUserService creates a new UserService
-func NewUserService(q *users.Queries) *UserService {
+func NewUserService(q *Queries) *UserService {
 	return &UserService{q: q}
 }
 
 // CreateUser creates a new user
-func (s *UserService) CreateUser(ctx context.Context, req *validation.CreateUserRequest) (int64, error) {
+func (s *UserService) CreateUser(ctx context.Context, req *CreateUserRequest) (int64, error) {
 
 	// Check if user with this email already exists
 	_, err := s.q.GetUserByEmail(ctx, req.Email)
 	if err == nil {
 		// User exists
-		return 0, user_error.ErrUserAlreadyExists
+		return 0, ErrUserAlreadyExists
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		// Other database error
@@ -37,7 +33,7 @@ func (s *UserService) CreateUser(ctx context.Context, req *validation.CreateUser
 	}
 
 	// Insert new user
-	arg := users.CreateUserParams{
+	arg := CreateUserParams{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
@@ -60,7 +56,7 @@ func (s *UserService) GetUser(ctx context.Context, idStr string) (*UserDTO, erro
 	u, err := s.q.GetUserByID(ctx, int32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, user_error.ErrUserNotFound
+			return nil, ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -73,7 +69,7 @@ func (s *UserService) GetUser(ctx context.Context, idStr string) (*UserDTO, erro
 }
 
 // UpdateUser updates a user
-func (s *UserService) UpdateUser(ctx context.Context, idStr string, req *validation.UpdateUserRequest) (*UserDTO, error) {
+func (s *UserService) UpdateUser(ctx context.Context, idStr string, req *UpdateUserRequest) (*UserDTO, error) {
 	id, err := s.parseUserID(idStr)
 	if err != nil {
 		return nil, err
@@ -83,7 +79,7 @@ func (s *UserService) UpdateUser(ctx context.Context, idStr string, req *validat
 	existing, err := s.q.GetUserByID(ctx, int32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, user_error.ErrUserNotFound
+			return nil, ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -103,7 +99,7 @@ func (s *UserService) UpdateUser(ctx context.Context, idStr string, req *validat
 			_, err := s.q.GetUserByEmail(ctx, email)
 			if err == nil {
 				// User with this email already exists
-				return nil, user_error.ErrUserAlreadyExists
+				return nil, ErrUserAlreadyExists
 			}
 			if !errors.Is(err, sql.ErrNoRows) {
 				return nil, err
@@ -114,7 +110,7 @@ func (s *UserService) UpdateUser(ctx context.Context, idStr string, req *validat
 		password = *req.Password
 	}
 
-	arg := users.UpdateUserParams{
+	arg := UpdateUserParams{
 		ID:       int32(id),
 		Name:     name,
 		Email:    email,
@@ -143,7 +139,7 @@ func (s *UserService) DeleteUser(ctx context.Context, idStr string) error {
 	_, err = s.q.GetUserByID(ctx, int32(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return user_error.ErrUserNotFound
+			return ErrUserNotFound
 		}
 		return err
 	}
