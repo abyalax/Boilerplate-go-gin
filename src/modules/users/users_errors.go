@@ -2,7 +2,6 @@ package users
 
 import "fmt"
 
-// Domain errors
 var (
 	ErrUserNotFound      = fmt.Errorf("user not found")
 	ErrInvalidEmail      = fmt.Errorf("invalid email")

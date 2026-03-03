@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load("../../.env") // load .env
+	godotenv.Load()
 
 	// Get configuration from environment
 	dbURL := getEnv("DATABASE_URL", "")

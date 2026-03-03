@@ -19,12 +19,13 @@ func LoggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
 		duration := time.Since(start)
 		statusCode := c.Writer.Status()
 
-		logger.Info(
-			"HTTP request",
-			zap.String("method", method),
-			zap.String("path", path),
-			zap.Int("status", statusCode),
-			zap.Duration("duration", duration),
+		sugar := logger.Sugar()
+		sugar.Infof(
+			"HTTP %s %s %d %s",
+			method,
+			path,
+			statusCode,
+			duration,
 		)
 	}
 }

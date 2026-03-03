@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/abyalax/Boilerplate-go-gin/src/config/logger"
 	middlewares "github.com/abyalax/Boilerplate-go-gin/src/middleware"
 	"github.com/abyalax/Boilerplate-go-gin/src/modules/users"
 	"github.com/gin-gonic/gin"
@@ -24,10 +25,7 @@ type App struct {
 // NewApp init the application
 func NewApp(dbURL string, port int) (*App, error) {
 	// Initialize logger
-	logger, err := initLogger()
-	if err != nil {
-		return nil, err
-	}
+	logger := logger.GetLogger()
 
 	// Init database
 	db, err := initDatabase(logger, dbURL)
@@ -95,7 +93,7 @@ func NewApp(dbURL string, port int) (*App, error) {
 
 // Start starts the application
 func (a *App) Start() error {
-	a.logger.Info("starting server", zap.String("address", a.server.Addr))
+	a.logger.Info("Application running on http://localhost:4000")
 	return a.server.ListenAndServe()
 }
 
@@ -110,15 +108,6 @@ func (a *App) Stop(ctx context.Context) error {
 
 	a.db.Close()
 	return nil
-}
-
-// initLogger initializes the zap logger
-func initLogger() (*zap.Logger, error) {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		return nil, err
-	}
-	return logger, nil
 }
 
 // initDatabase initializes the database connection using sql.DB with pgx driver
