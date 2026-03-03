@@ -5,6 +5,7 @@ sql:
     engine: postgresql
     gen:
       go:
+        sql_package: "pgx/v5"
         package: "users"
         out: "src/modules/users"
 
@@ -13,5 +14,6 @@ sql:
     engine: postgresql
     gen:
       go:
+        sql_package: "pgx/v5"
         package: "auth"
         out: "src/modules/auth"

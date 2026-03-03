@@ -61,7 +61,7 @@ migrate-status:
 
 run-dev:
 	@echo "Running application..."
-	cd cmd/api && fresh
+	air
 
 # Test targets
 test: test-unit test-e2e

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abyalax/Boilerplate-go-gin/src/config/logger"
+	"github.com/abyalax/Boilerplate-go-gin/src/conf/logger"
 	middlewares "github.com/abyalax/Boilerplate-go-gin/src/middleware"
-	"github.com/abyalax/Boilerplate-go-gin/src/modules/users"
+	users "github.com/abyalax/Boilerplate-go-gin/src/modules/users"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
@@ -51,15 +51,14 @@ func NewApp(dbURL string, port int) (*App, error) {
 	// Register routes
 	v1 := router.Group("/api/v1")
 	{
-		users := v1.Group("/users")
+		usersRoute := v1.Group("/users")
 		{
-			users.POST("", userHandler.CreateUser)
-			users.GET("", userHandler.ListUsers)
-			users.GET("/:id", userHandler.GetUser)
-			users.PUT("/:id", userHandler.UpdateUser)
-			users.DELETE("/:id", userHandler.DeleteUser)
+			usersRoute.POST("", middlewares.BindJSON[users.CreateUserRequest](logger), userHandler.CreateUser)
+			usersRoute.GET("", userHandler.ListUsers)
+			usersRoute.GET("/:id", middlewares.BindURI[users.UserIDParams](logger), userHandler.GetUser)
+			usersRoute.PUT("/:id", middlewares.BindURI[users.UserIDParams](logger), middlewares.BindJSON[users.UpdateUserRequest](logger), userHandler.UpdateUser)
+			usersRoute.DELETE("/:id", middlewares.BindURI[users.UserIDParams](logger), userHandler.DeleteUser)
 		}
-
 		// Health check
 		v1.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "healthy"})
