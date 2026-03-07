@@ -1,16 +1,19 @@
 meta {
-  name: Get User by ID
+  name: Get User By ID
   type: http
-  seq: 3
+  seq: 4
 }
 
 get {
   url: {{api_url}}/users/1
+  body: none
+  auth: inherit
 }
 
-params {
-  id: 1
+settings {
+  encodeUrl: true
 }
+
 
 docs {
   # Get User by ID

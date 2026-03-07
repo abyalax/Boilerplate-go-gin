@@ -1,15 +1,17 @@
 meta {
-  name: Delete User
+  name: Delete User By ID
   type: http
   seq: 5
 }
 
 delete {
   url: {{api_url}}/users/1
+  body: none
+  auth: inherit
 }
 
-params {
-  id: 1
+settings {
+  encodeUrl: true
 }
 
 docs {
@@ -34,3 +36,4 @@ docs {
   - **404 Not Found**: User not found
   - **500 Internal Server Error**: Database or server error
 }
+
