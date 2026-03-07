@@ -17,7 +17,7 @@ FROM users
 WHERE name = $1;
 
 -- Get user with roles and permissions
--- name: GetUserWithPermissions :one
+-- name: GetUserWithPermissions :many
 SELECT 
     u.id AS user_id,
     u.name AS user_name,

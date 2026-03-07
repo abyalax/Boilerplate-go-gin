@@ -2,15 +2,16 @@ package bootstrap
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/abyalax/Boilerplate-go-gin/src/conf/logger"
 	middlewares "github.com/abyalax/Boilerplate-go-gin/src/middleware"
+	"github.com/abyalax/Boilerplate-go-gin/src/modules/auth"
 	users "github.com/abyalax/Boilerplate-go-gin/src/modules/users"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
@@ -19,7 +20,7 @@ import (
 type App struct {
 	server *http.Server
 	logger *zap.Logger
-	db     *sql.DB
+	db     *pgxpool.Pool
 }
 
 // NewApp init the application
@@ -33,14 +34,9 @@ func NewApp(dbURL string, port int) (*App, error) {
 		logger.Fatal("failed to initialize database", zap.Error(err))
 	}
 
-	userQueries := users.New(db)                     // Initialize repository layer
-	userService := users.NewUserService(userQueries) // Initialize service layer
-	userHandler := users.NewUserHandler(             // Initialize HTTP handlers
-		userService,
-		logger,
-	)
+	userModule := users.NewUserModule(db, logger)
+	authModule := auth.NewAuthModule(db, logger)
 
-	// Init Gin router
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
@@ -48,33 +44,23 @@ func NewApp(dbURL string, port int) (*App, error) {
 	router.Use(middlewares.RecoveryMiddleware(logger))
 	router.Use(middlewares.ErrorHandler(logger))
 
-	// Register routes
 	v1 := router.Group("/api/v1")
-	{
-		usersRoute := v1.Group("/users")
-		{
-			usersRoute.POST("", middlewares.BindJSON[users.CreateUserRequest](logger), userHandler.CreateUser)
-			usersRoute.GET("", userHandler.ListUsers)
-			usersRoute.GET("/:id", middlewares.BindURI[users.UserIDParams](logger), userHandler.GetUser)
-			usersRoute.PUT("/:id", middlewares.BindURI[users.UserIDParams](logger), middlewares.BindJSON[users.UpdateUserRequest](logger), userHandler.UpdateUser)
-			usersRoute.DELETE("/:id", middlewares.BindURI[users.UserIDParams](logger), userHandler.DeleteUser)
+
+	userModule.RegisterRoutes(v1, logger)
+	authModule.RegisterRoutes(v1, logger)
+
+	v1.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
+	})
+
+	v1.GET("/ready", func(c *gin.Context) {
+		if err := db.Ping(c.Request.Context()); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
+			return
 		}
-		// Health check
-		v1.GET("/health", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"status": "healthy"})
-		})
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+	})
 
-		// Ready check
-		v1.GET("/ready", func(c *gin.Context) {
-			if err := db.PingContext(c.Request.Context()); err != nil {
-				c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{"status": "ready"})
-		})
-	}
-
-	// Initialize HTTP server
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      router,
@@ -109,22 +95,21 @@ func (a *App) Stop(ctx context.Context) error {
 	return nil
 }
 
-// initDatabase initializes the database connection using sql.DB with pgx driver
-func initDatabase(logger *zap.Logger, dbURL string) (*sql.DB, error) {
-	db, err := sql.Open("pgx", dbURL)
+func initDatabase(logger *zap.Logger, dbURL string) (*pgxpool.Pool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Test connection
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
 		return nil, err
 	}
 
 	logger.Info("database connected successfully")
-	return db, nil
+
+	return pool, nil
 }

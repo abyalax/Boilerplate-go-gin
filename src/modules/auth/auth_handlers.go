@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	api "github.com/abyalax/Boilerplate-go-gin/src/conf/response"
+	httpBind "github.com/abyalax/Boilerplate-go-gin/src/http"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -13,7 +14,6 @@ type AuthHandler struct {
 	logger      *zap.Logger
 }
 
-// NewUserHandler creates a new UserHandler
 func NewAuthHandler(
 	authService *AuthService,
 	logger *zap.Logger,
@@ -26,13 +26,7 @@ func NewAuthHandler(
 
 // POST /auth/login
 func (h *AuthHandler) Login(c *gin.Context) {
-	var req LoginRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.logger.Warn("invalid request body", zap.Error(err))
-		c.Error(err)
-		return
-	}
+	req := httpBind.MustGetBody[LoginRequest](c)
 
 	signedIn, err := h.authService.Login(c.Request.Context(), &req)
 	if err != nil {
@@ -50,5 +44,25 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, resp)
+
+}
+
+// POST /auth/register
+func (h *AuthHandler) Register(c *gin.Context) {
+	req := httpBind.MustGetBody[RegisterRequest](c)
+
+	registered, err := h.authService.Register(c.Request.Context(), &req)
+	if err != nil {
+		h.logger.Error("registration failed", zap.Error(err))
+		c.Error(err)
+		return
+	}
+
+	resp := api.Response[RegisterResponse]{
+		Message: "registration successfully",
+		Data:    registered,
+	}
+
+	c.JSON(http.StatusCreated, resp)
 
 }

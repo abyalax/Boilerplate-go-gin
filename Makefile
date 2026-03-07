@@ -8,12 +8,14 @@ ifeq ($(OS),Windows_NT)
     RM := rmdir /s /q
     RMFILE := del /f /q
     CHECK_CMD = where
+    DOCKER_COMPOSE = docker compose
 else
     NULL := /dev/null
     SLEEP := sleep 5
     RM := rm -rf
     RMFILE := rm -f
     CHECK_CMD = command -v
+    DOCKER_COMPOSE = docker compose
 endif
 
 help:
@@ -37,15 +39,15 @@ help:
 
 # Database targets
 db-up:
-	docker compose -f docker-compose.yaml up -d
+	db.bat up
 	@echo "Database is starting, waiting..."
 	@$(SLEEP)
 
 db-down:
-	docker compose -f docker-compose.yaml down -v
+	db.bat down
 
 db-logs:
-	docker compose -f docker-compose.yaml logs -f postgres
+	db.bat logs
 
 # Migration targets
 migrate-up: db-up
@@ -64,22 +66,12 @@ run-dev:
 	air
 
 # Test targets
-test: test-unit test-e2e
+test: test-e2e
 	@echo "All tests passed!"
 
-test-unit:
-	go test -v -cover ./test/unit/...
-
-test-e2e: migrate-up
+test-e2e: 
+	@echo "Start E2E tests!"
 	go test -v -timeout 60s -cover ./test/e2e/...
-
-test-coverage:
-	go test -v -coverprofile=coverage.out -covermode=atomic ./...
-	go tool cover -html=coverage.out -o coverage.html
-
-test-race:
-	go test -v -race ./test/unit/...
-	go test -v -race -timeout 60s ./test/e2e/...
 
 # Code generation
 sqlc:

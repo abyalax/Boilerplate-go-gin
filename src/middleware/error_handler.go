@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/abyalax/Boilerplate-go-gin/src/modules/users"
+	"github.com/abyalax/Boilerplate-go-gin/src/reject"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -37,7 +37,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 
 	// Domain errors
 	switch {
-	case errors.Is(err, users.ErrUserNotFound):
+	case errors.Is(err, reject.UserNotFound):
 		logger.Warn("user not found", zap.Error(err))
 		c.JSON(http.StatusNotFound, ErrorResponse{
 			Code:    "USER_NOT_FOUND",
@@ -45,7 +45,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusNotFound,
 		})
 
-	case errors.Is(err, users.ErrUserAlreadyExists):
+	case errors.Is(err, reject.UserAlreadyExists):
 		logger.Warn("user already exists", zap.Error(err))
 		c.JSON(http.StatusConflict, ErrorResponse{
 			Code:    "USER_ALREADY_EXISTS",
@@ -53,7 +53,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusConflict,
 		})
 
-	case errors.Is(err, users.ErrInvalidEmail):
+	case errors.Is(err, reject.InvalidEmail):
 		logger.Warn("invalid email", zap.Error(err))
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Code:    "INVALID_EMAIL",
@@ -61,7 +61,7 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusBadRequest,
 		})
 
-	case errors.Is(err, users.ErrInvalidName):
+	case errors.Is(err, reject.InvalidName):
 		logger.Warn("invalid name", zap.Error(err))
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Code:    "INVALID_NAME",
@@ -69,12 +69,36 @@ func handleError(c *gin.Context, logger *zap.Logger, err error) {
 			Status:  http.StatusBadRequest,
 		})
 
-	case errors.Is(err, users.ErrInvalidPassword):
+	case errors.Is(err, reject.InvalidPassword):
 		logger.Warn("invalid password", zap.Error(err))
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Code:    "INVALID_PASSWORD",
 			Message: err.Error(),
 			Status:  http.StatusBadRequest,
+		})
+
+	case errors.Is(err, reject.AuthEmailNotFound):
+		logger.Warn("auth email not found", zap.Error(err))
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Code:    "AUTH_EMAIL_NOT_FOUND",
+			Message: "Email not found",
+			Status:  http.StatusNotFound,
+		})
+
+	case errors.Is(err, reject.AuthInvalidPassword):
+		logger.Warn("auth invalid password", zap.Error(err))
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Code:    "AUTH_INVALID_PASSWORD",
+			Message: "Invalid password",
+			Status:  http.StatusUnauthorized,
+		})
+
+	case errors.Is(err, reject.AuthEmailAlreadyExists):
+		logger.Warn("auth email already exists", zap.Error(err))
+		c.JSON(http.StatusConflict, ErrorResponse{
+			Code:    "AUTH_EMAIL_ALREADY_EXISTS",
+			Message: "email already exists",
+			Status:  http.StatusConflict,
 		})
 
 	default:

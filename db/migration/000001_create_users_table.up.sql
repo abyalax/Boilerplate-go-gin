@@ -6,7 +6,7 @@ CREATE TABLE "users" (
     "password" VARCHAR(255) NOT NULL,
     "email" VARCHAR(255) NOT NULL,
 
-    UNIQUE("email")
+    UNIQUE("email"),
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 

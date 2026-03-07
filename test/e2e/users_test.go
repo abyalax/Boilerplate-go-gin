@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/abyalax/Boilerplate-go-gin/src/bootstrap"
+	"github.com/abyalax/Boilerplate-go-gin/src/modules/auth"
 	"github.com/joho/godotenv"
 )
 
@@ -25,14 +25,14 @@ type TestSuite struct {
 // NewTestSuite creates a new E2E test suite
 func NewTestSuite(t *testing.T) *TestSuite {
 	_ = godotenv.Load("../../.env") // load .env
-	// Get database URL
+	// Get database URL and server port
 	dbURL := os.Getenv("DATABASE_URL")
-	dbPort := os.Getenv("DATABASE_PORT")
 	baseURL := os.Getenv("BASE_URL")
 
-	parsedDbPort, err := strconv.ParseInt(dbPort, 10, 64)
-	if err != nil {
-		t.Fatal(err)
+	// Use different ports for different tests to avoid conflicts
+	serverPort := 4001 + int(time.Now().Unix()%100) // Use port 4001-4100
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("http://localhost:%d", serverPort)
 	}
 
 	// Create test database connection
@@ -46,10 +46,13 @@ func NewTestSuite(t *testing.T) *TestSuite {
 	}
 
 	// Initialize application
-	app, err := bootstrap.NewApp(dbURL, int(parsedDbPort))
+	app, err := bootstrap.NewApp(dbURL, serverPort)
 	if err != nil {
 		t.Fatalf("Failed to initialize app: %v", err)
 	}
+
+	// Create HTTP client with the dynamic base URL
+	httpClient := NewHTTPClient(t, baseURL)
 
 	// Start server in goroutine
 	go func() {
@@ -58,11 +61,22 @@ func NewTestSuite(t *testing.T) *TestSuite {
 		}
 	}()
 
-	// Wait for server to be ready
-	time.Sleep(2 * time.Second)
+	// Wait for server to be ready with health check
+	maxRetries := 10
+	ready := false
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(500 * time.Millisecond)
+		resp, err := httpClient.Get("/api/v1/health")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			ready = true
+			break
+		}
+		t.Logf("Waiting for server to be ready... (attempt %d/%d)", i+1, maxRetries)
+	}
 
-	// Create HTTP client
-	httpClient := NewHTTPClient(t, baseURL)
+	if !ready {
+		t.Fatalf("Server failed to become ready after %d attempts", maxRetries)
+	}
 
 	return &TestSuite{
 		app:        app,
@@ -94,6 +108,8 @@ func (ts *TestSuite) Close() {
 // BeforeEach runs before each test
 func (ts *TestSuite) BeforeEach() {
 	ts.testDB.BeforeEach(ts.t)
+	// Clear the auth user store for each test
+	auth.ClearUserStore()
 }
 
 // AfterEach runs after each test
@@ -148,20 +164,32 @@ func TestCreateUser(t *testing.T) {
 
 	// Check for either success or internal error (due to DB issues)
 	if resp.StatusCode == http.StatusCreated {
-		var userResp UserResponse
-		if err := resp.UnmarshalJSON(&userResp); err != nil {
-			t.Logf("Could not unmarshal response: %v", err)
+		var successResp SuccessResponse
+		if err := resp.UnmarshalJSON(&successResp); err != nil {
+			t.Logf("Could not unmarshal success response: %v", err)
 			return
 		}
 
-		if userResp.ID == 0 {
+		// Try to extract user data from the nested structure
+		userData, ok := successResp.Data.(map[string]interface{})
+		if !ok {
+			t.Logf("Response data is not in expected format")
+			return
+		}
+
+		// Extract user ID, name, and email from the nested data
+		userID, _ := userData["id"].(float64)
+		name, _ := userData["name"].(string)
+		email, _ := userData["email"].(string)
+
+		if int64(userID) == 0 {
 			t.Error("Expected non-zero user ID")
 		}
-		if userResp.Name != payload["name"] {
-			t.Errorf("Expected name %s, got %s", payload["name"], userResp.Name)
+		if name != payload["name"] {
+			t.Errorf("Expected name %s, got %s", payload["name"], name)
 		}
-		if userResp.Email != payload["email"] {
-			t.Errorf("Expected email %s, got %s", payload["email"], userResp.Email)
+		if email != payload["email"] {
+			t.Errorf("Expected email %s, got %s", payload["email"], email)
 		}
 	} else {
 		t.Logf("Create user returned status %d (expected 201)", resp.StatusCode)
@@ -241,12 +269,19 @@ func TestUpdateUser(t *testing.T) {
 		return
 	}
 
-	var userResp UserResponse
-	if err := createResp.UnmarshalJSON(&userResp); err != nil {
+	var successResp SuccessResponse
+	if err := createResp.UnmarshalJSON(&successResp); err != nil {
 		t.Fatalf("Failed to unmarshal create response: %v", err)
 	}
 
-	userID := userResp.ID
+	// Extract user ID from nested data structure
+	userData, ok := successResp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Create response data is not in expected format")
+	}
+
+	userIDFloat, _ := userData["id"].(float64)
+	userID := int64(userIDFloat)
 
 	// Update user name
 	updatePayload := map[string]interface{}{
@@ -259,16 +294,25 @@ func TestUpdateUser(t *testing.T) {
 	}
 
 	if resp.StatusCode == http.StatusOK {
-		var updatedResp UserResponse
-		if err := resp.UnmarshalJSON(&updatedResp); err != nil {
+		var updateSuccessResp SuccessResponse
+		if err := resp.UnmarshalJSON(&updateSuccessResp); err != nil {
 			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
 
-		if updatedResp.Name != "Updated Name" {
-			t.Errorf("Expected name Updated Name, got %s", updatedResp.Name)
+		// Extract updated user data
+		updatedUserData, ok := updateSuccessResp.Data.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Update response data is not in expected format")
 		}
-		if updatedResp.Email != "original@example.com" {
-			t.Errorf("Expected email to remain original@example.com, got %s", updatedResp.Email)
+
+		name, _ := updatedUserData["name"].(string)
+		email, _ := updatedUserData["email"].(string)
+
+		if name != "Updated Name" {
+			t.Errorf("Expected name Updated Name, got %s", name)
+		}
+		if email != "original@example.com" {
+			t.Errorf("Expected email to remain original@example.com, got %s", email)
 		}
 	}
 }
@@ -311,12 +355,19 @@ func TestUpdateUserEmail(t *testing.T) {
 		return
 	}
 
-	var userResp UserResponse
-	if err := resp2.UnmarshalJSON(&userResp); err != nil {
+	var successResp SuccessResponse
+	if err := resp2.UnmarshalJSON(&successResp); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
-	userID2 := userResp.ID
+	// Extract user ID from nested data structure
+	userData, ok := successResp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Create response data is not in expected format")
+	}
+
+	userID2Float, _ := userData["id"].(float64)
+	userID2 := int64(userID2Float)
 
 	// Try to update user 2's email to user 1's email
 	updatePayload := map[string]interface{}{
@@ -355,12 +406,19 @@ func TestDeleteUser(t *testing.T) {
 		return
 	}
 
-	var userResp UserResponse
-	if err := createResp.UnmarshalJSON(&userResp); err != nil {
+	var successResp SuccessResponse
+	if err := createResp.UnmarshalJSON(&successResp); err != nil {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
-	userID := userResp.ID
+	// Extract user ID from nested data structure
+	userData, ok := successResp.Data.(map[string]interface{})
+	if !ok {
+		t.Fatalf("Create response data is not in expected format")
+	}
+
+	userIDFloat, _ := userData["id"].(float64)
+	userID := int64(userIDFloat)
 
 	// Delete user via API
 	resp, err := suite.httpClient.Delete(fmt.Sprintf("/api/v1/users/%d", userID))

@@ -1,0 +1,25 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{api_url}}/auth/login
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "admin@gmail.com",
+    "password": "secure_pass"
+  }
+}
+
+settings {
+  encodeUrl: true
+}
