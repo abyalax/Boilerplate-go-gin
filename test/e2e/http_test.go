@@ -10,14 +10,12 @@ import (
 	"time"
 )
 
-// HTTPClient wraps http.Client for E2E API testing
 type HTTPClient struct {
 	baseURL string
 	client  *http.Client
 	t       *testing.T
 }
 
-// NewHTTPClient creates an HTTP client for testing
 func NewHTTPClient(t *testing.T, baseURL string) *HTTPClient {
 	return &HTTPClient{
 		baseURL: baseURL,
@@ -28,7 +26,6 @@ func NewHTTPClient(t *testing.T, baseURL string) *HTTPClient {
 	}
 }
 
-// Request wraps HTTP request details
 type Request struct {
 	Method  string
 	Path    string
@@ -36,14 +33,12 @@ type Request struct {
 	Headers map[string]string
 }
 
-// Response wraps HTTP response details
 type Response struct {
 	StatusCode int
 	Body       []byte
 	Headers    http.Header
 }
 
-// Do performs an HTTP request and returns the response
 func (hc *HTTPClient) Do(req *Request) (*Response, error) {
 	var body io.Reader
 	if req.Body != nil {
@@ -85,7 +80,6 @@ func (hc *HTTPClient) Do(req *Request) (*Response, error) {
 	}, nil
 }
 
-// Post performs a POST request
 func (hc *HTTPClient) Post(path string, body interface{}) (*Response, error) {
 	return hc.Do(&Request{
 		Method: http.MethodPost,
@@ -94,7 +88,6 @@ func (hc *HTTPClient) Post(path string, body interface{}) (*Response, error) {
 	})
 }
 
-// Get performs a GET request
 func (hc *HTTPClient) Get(path string) (*Response, error) {
 	return hc.Do(&Request{
 		Method: http.MethodGet,
@@ -102,7 +95,6 @@ func (hc *HTTPClient) Get(path string) (*Response, error) {
 	})
 }
 
-// Put performs a PUT request
 func (hc *HTTPClient) Put(path string, body interface{}) (*Response, error) {
 	return hc.Do(&Request{
 		Method: http.MethodPut,
@@ -111,7 +103,6 @@ func (hc *HTTPClient) Put(path string, body interface{}) (*Response, error) {
 	})
 }
 
-// Delete performs a DELETE request
 func (hc *HTTPClient) Delete(path string) (*Response, error) {
 	return hc.Do(&Request{
 		Method: http.MethodDelete,
@@ -119,7 +110,6 @@ func (hc *HTTPClient) Delete(path string) (*Response, error) {
 	})
 }
 
-// UnmarshalJSON unmarshals response body to target struct
 func (r *Response) UnmarshalJSON(target interface{}) error {
 	if err := json.Unmarshal(r.Body, target); err != nil {
 		return fmt.Errorf("failed to unmarshal response: %w", err)
@@ -127,32 +117,27 @@ func (r *Response) UnmarshalJSON(target interface{}) error {
 	return nil
 }
 
-// AssertStatusCode asserts the response status code
 func (r *Response) AssertStatusCode(t *testing.T, expected int) {
 	if r.StatusCode != expected {
 		t.Errorf("Expected status code %d, got %d. Body: %s", expected, r.StatusCode, string(r.Body))
 	}
 }
 
-// ErrorResponse represents an error response from the API
 type ErrorResponse struct {
 	Message string `json:"message"`
 	Error   string `json:"error"`
 }
 
-// SuccessResponse represents a success response with data
 type SuccessResponse struct {
 	Data interface{} `json:"data"`
 }
 
-// UserResponse represents a user in API responses
 type UserResponse struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
 }
 
-// UsersListResponse represents multiple users in API responses
 type UsersListResponse struct {
 	Data []UserResponse `json:"data"`
 }

@@ -3,10 +3,10 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/abyalax/Boilerplate-go-gin/src/config/env"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,12 +21,13 @@ func NewTestDB(t *testing.T) *TestDB {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://boilerplate_go_gin:boilerplate_go_gin@localhost:5432/db_boilerplate_go_gin?sslmode=disable"
+	// Load environment configuration
+	cfg, err := env.Load()
+	if err != nil {
+		t.Fatalf("Failed to load environment config: %v", err)
 	}
 
-	pool, err := pgxpool.New(ctx, dbURL)
+	pool, err := pgxpool.New(ctx, cfg.GetDatabaseURL())
 	if err != nil {
 		t.Fatalf("Failed to create connection pool: %v", err)
 	}
@@ -36,7 +37,7 @@ func NewTestDB(t *testing.T) *TestDB {
 		t.Fatalf("Failed to ping database: %v", err)
 	}
 
-	t.Logf("Connected to database: %s", dbURL)
+	t.Logf("Connected to database: %s", cfg.GetDatabaseURL())
 
 	return &TestDB{
 		pool: pool,

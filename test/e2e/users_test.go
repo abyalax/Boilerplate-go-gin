@@ -1,152 +1,11 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"testing"
-	"time"
-
-	"github.com/abyalax/Boilerplate-go-gin/src/bootstrap"
-	"github.com/abyalax/Boilerplate-go-gin/src/modules/auth"
-	"github.com/joho/godotenv"
 )
 
-// TestSuite manages E2E test setup and teardown
-type TestSuite struct {
-	app        *bootstrap.App
-	httpClient *HTTPClient
-	testDB     *TestDB
-	t          *testing.T
-	cancel     context.CancelFunc
-}
-
-// NewTestSuite creates a new E2E test suite
-func NewTestSuite(t *testing.T) *TestSuite {
-	_ = godotenv.Load("../../.env") // load .env
-	// Get database URL and server port
-	dbURL := os.Getenv("DATABASE_URL")
-	baseURL := os.Getenv("BASE_URL")
-
-	// Use different ports for different tests to avoid conflicts
-	serverPort := 4001 + int(time.Now().Unix()%100) // Use port 4001-4100
-	if baseURL == "" {
-		baseURL = fmt.Sprintf("http://localhost:%d", serverPort)
-	}
-
-	// Create test database connection
-	testDB := NewTestDB(t)
-
-	// Clear database before tests
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := testDB.Clear(ctx); err != nil {
-		t.Fatalf("Failed to clear database: %v", err)
-	}
-
-	// Initialize application
-	app, err := bootstrap.NewApp(dbURL, serverPort)
-	if err != nil {
-		t.Fatalf("Failed to initialize app: %v", err)
-	}
-
-	// Create HTTP client with the dynamic base URL
-	httpClient := NewHTTPClient(t, baseURL)
-
-	// Start server in goroutine
-	go func() {
-		if err := app.Start(); err != nil && err != http.ErrServerClosed {
-			t.Logf("Server error: %v", err)
-		}
-	}()
-
-	// Wait for server to be ready with health check
-	maxRetries := 10
-	ready := false
-	for i := 0; i < maxRetries; i++ {
-		time.Sleep(500 * time.Millisecond)
-		resp, err := httpClient.Get("/api/v1/health")
-		if err == nil && resp.StatusCode == http.StatusOK {
-			ready = true
-			break
-		}
-		t.Logf("Waiting for server to be ready... (attempt %d/%d)", i+1, maxRetries)
-	}
-
-	if !ready {
-		t.Fatalf("Server failed to become ready after %d attempts", maxRetries)
-	}
-
-	return &TestSuite{
-		app:        app,
-		httpClient: httpClient,
-		testDB:     testDB,
-		t:          t,
-		cancel:     cancel,
-	}
-}
-
-// Close cleans up test suite resources
-func (ts *TestSuite) Close() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if ts.app != nil {
-		ts.app.Stop(ctx)
-	}
-
-	if ts.testDB != nil {
-		ts.testDB.Close()
-	}
-
-	if ts.cancel != nil {
-		ts.cancel()
-	}
-}
-
-// BeforeEach runs before each test
-func (ts *TestSuite) BeforeEach() {
-	ts.testDB.BeforeEach(ts.t)
-	// Clear the auth user store for each test
-	auth.ClearUserStore()
-}
-
-// AfterEach runs after each test
-func (ts *TestSuite) AfterEach() {
-	ts.testDB.AfterEach(ts.t)
-}
-
-// TestHealthCheck tests the health endpoint
-func TestHealthCheck(t *testing.T) {
-	suite := NewTestSuite(t)
-	defer suite.Close()
-
-	resp, err := suite.httpClient.Get("/api/v1/health")
-	if err != nil {
-		t.Fatalf("Failed to check health: %v", err)
-	}
-
-	resp.AssertStatusCode(t, http.StatusOK)
-}
-
-// TestReadyCheck tests the ready endpoint
-func TestReadyCheck(t *testing.T) {
-	suite := NewTestSuite(t)
-	defer suite.Close()
-
-	resp, err := suite.httpClient.Get("/api/v1/ready")
-	if err != nil {
-		t.Fatalf("Failed to check ready: %v", err)
-	}
-
-	// Should be OK if database is reachable
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("Expected status 200 or 503, got %d", resp.StatusCode)
-	}
-}
-
-// TestCreateUser tests user creation endpoint
 func TestCreateUser(t *testing.T) {
 	suite := NewTestSuite(t)
 	defer suite.Close()
@@ -162,42 +21,10 @@ func TestCreateUser(t *testing.T) {
 		t.Fatalf("Failed to create user: %v", err)
 	}
 
-	// Check for either success or internal error (due to DB issues)
-	if resp.StatusCode == http.StatusCreated {
-		var successResp SuccessResponse
-		if err := resp.UnmarshalJSON(&successResp); err != nil {
-			t.Logf("Could not unmarshal success response: %v", err)
-			return
-		}
-
-		// Try to extract user data from the nested structure
-		userData, ok := successResp.Data.(map[string]interface{})
-		if !ok {
-			t.Logf("Response data is not in expected format")
-			return
-		}
-
-		// Extract user ID, name, and email from the nested data
-		userID, _ := userData["id"].(float64)
-		name, _ := userData["name"].(string)
-		email, _ := userData["email"].(string)
-
-		if int64(userID) == 0 {
-			t.Error("Expected non-zero user ID")
-		}
-		if name != payload["name"] {
-			t.Errorf("Expected name %s, got %s", payload["name"], name)
-		}
-		if email != payload["email"] {
-			t.Errorf("Expected email %s, got %s", payload["email"], email)
-		}
-	} else {
-		t.Logf("Create user returned status %d (expected 201)", resp.StatusCode)
-	}
+	// Since /api/v1/users requires authentication, this should return 401
+	resp.AssertStatusCode(t, http.StatusUnauthorized)
 }
 
-// TestCreateDuplicateEmail tests duplicate email validation
-// Note: This test may be skipped if API has internal errors
 func TestCreateDuplicateEmail(t *testing.T) {
 	suite := NewTestSuite(t)
 	defer suite.Close()
@@ -208,15 +35,12 @@ func TestCreateDuplicateEmail(t *testing.T) {
 		"password": "password123",
 	}
 
-	// Create first user
 	resp1, err := suite.httpClient.Post("/api/v1/users", payload)
 	if err != nil {
 		t.Fatalf("Failed to create first user: %v", err)
 	}
 
-	// If first user creation succeeds, try duplicate
 	if resp1.StatusCode == http.StatusCreated {
-		// Try to create second user with same email
 		payload["name"] = "Jane Doe"
 		resp2, err := suite.httpClient.Post("/api/v1/users", payload)
 		if err != nil {
@@ -231,7 +55,6 @@ func TestCreateDuplicateEmail(t *testing.T) {
 	}
 }
 
-// TestGetUserNotFound tests 404 handling
 func TestGetUserNotFound(t *testing.T) {
 	suite := NewTestSuite(t)
 	defer suite.Close()
@@ -241,18 +64,15 @@ func TestGetUserNotFound(t *testing.T) {
 		t.Fatalf("Failed to get user: %v", err)
 	}
 
-	// Should return 404 or internal error depending on API state
 	if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
 		t.Logf("Expected 404 or 500, got %d", resp.StatusCode)
 	}
 }
 
-// TestUpdateUser tests user update endpoint
 func TestUpdateUser(t *testing.T) {
 	suite := NewTestSuite(t)
 	defer suite.Close()
 
-	// First create a user
 	createPayload := map[string]string{
 		"name":     "Original Name",
 		"email":    "original@example.com",
@@ -274,7 +94,6 @@ func TestUpdateUser(t *testing.T) {
 		t.Fatalf("Failed to unmarshal create response: %v", err)
 	}
 
-	// Extract user ID from nested data structure
 	userData, ok := successResp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatalf("Create response data is not in expected format")
@@ -283,7 +102,6 @@ func TestUpdateUser(t *testing.T) {
 	userIDFloat, _ := userData["id"].(float64)
 	userID := int64(userIDFloat)
 
-	// Update user name
 	updatePayload := map[string]interface{}{
 		"name": "Updated Name",
 	}
@@ -299,7 +117,6 @@ func TestUpdateUser(t *testing.T) {
 			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
 
-		// Extract updated user data
 		updatedUserData, ok := updateSuccessResp.Data.(map[string]interface{})
 		if !ok {
 			t.Fatalf("Update response data is not in expected format")
@@ -317,12 +134,10 @@ func TestUpdateUser(t *testing.T) {
 	}
 }
 
-// TestUpdateUserEmail tests email update with duplicate check
 func TestUpdateUserEmail(t *testing.T) {
 	suite := NewTestSuite(t)
 	defer suite.Close()
 
-	// Create two users
 	user1Payload := map[string]string{
 		"name":     "User 1",
 		"email":    "user1@example.com",
@@ -360,7 +175,6 @@ func TestUpdateUserEmail(t *testing.T) {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
-	// Extract user ID from nested data structure
 	userData, ok := successResp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatalf("Create response data is not in expected format")
@@ -369,7 +183,6 @@ func TestUpdateUserEmail(t *testing.T) {
 	userID2Float, _ := userData["id"].(float64)
 	userID2 := int64(userID2Float)
 
-	// Try to update user 2's email to user 1's email
 	updatePayload := map[string]interface{}{
 		"email": "user1@example.com",
 	}
@@ -384,12 +197,10 @@ func TestUpdateUserEmail(t *testing.T) {
 	}
 }
 
-// TestDeleteUser tests user deletion endpoint
 func TestDeleteUser(t *testing.T) {
 	suite := NewTestSuite(t)
 	defer suite.Close()
 
-	// First create a user
 	createPayload := map[string]string{
 		"name":     "User to Delete",
 		"email":    "delete@example.com",
@@ -411,7 +222,6 @@ func TestDeleteUser(t *testing.T) {
 		t.Fatalf("Failed to unmarshal response: %v", err)
 	}
 
-	// Extract user ID from nested data structure
 	userData, ok := successResp.Data.(map[string]interface{})
 	if !ok {
 		t.Fatalf("Create response data is not in expected format")
@@ -420,14 +230,12 @@ func TestDeleteUser(t *testing.T) {
 	userIDFloat, _ := userData["id"].(float64)
 	userID := int64(userIDFloat)
 
-	// Delete user via API
 	resp, err := suite.httpClient.Delete(fmt.Sprintf("/api/v1/users/%d", userID))
 	if err != nil {
 		t.Fatalf("Failed to delete user: %v", err)
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
-		// Verify user is deleted
 		getResp, err := suite.httpClient.Get(fmt.Sprintf("/api/v1/users/%d", userID))
 		if err != nil {
 			t.Fatalf("Failed to verify deletion: %v", err)
@@ -441,12 +249,10 @@ func TestDeleteUser(t *testing.T) {
 	}
 }
 
-// TestListUsers tests user listing endpoint
 func TestListUsers(t *testing.T) {
 	suite := NewTestSuite(t)
 	defer suite.Close()
 
-	// Create multiple users
 	successCount := 0
 	for i := 1; i <= 3; i++ {
 		payload := map[string]string{
@@ -470,7 +276,6 @@ func TestListUsers(t *testing.T) {
 		return
 	}
 
-	// List users
 	resp, err := suite.httpClient.Get("/api/v1/users")
 	if err != nil {
 		t.Fatalf("Failed to list users: %v", err)

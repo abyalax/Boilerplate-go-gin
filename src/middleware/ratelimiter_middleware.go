@@ -10,7 +10,7 @@ import (
 )
 
 func RateLimiter(logger *zap.Logger) gin.HandlerFunc {
-	limiter := rate.NewLimiter(rate.Every(time.Second), 10)
+	limiter := rate.NewLimiter(rate.Every(time.Second), 50)
 	return func(c *gin.Context) {
 		if !limiter.Allow() {
 			logger.Warn("Too many request detected")
