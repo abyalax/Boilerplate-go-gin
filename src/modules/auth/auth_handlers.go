@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	api "github.com/abyalax/Boilerplate-go-gin/src/conf/response"
+	api "github.com/abyalax/Boilerplate-go-gin/src/config/response"
 	httpBind "github.com/abyalax/Boilerplate-go-gin/src/http"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -30,7 +30,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	signedIn, err := h.authService.Login(c.Request.Context(), &req)
 	if err != nil {
-		h.logger.Error("login failed", zap.Error(err))
+		h.logger.Warn("login failed for email " + req.Email)
 		c.Error(err)
 		return
 	}

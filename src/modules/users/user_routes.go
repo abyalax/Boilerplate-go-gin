@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/abyalax/Boilerplate-go-gin/src/config/env"
 	middlewares "github.com/abyalax/Boilerplate-go-gin/src/middleware"
 )
 
@@ -21,8 +22,8 @@ func NewUserModule(db DBTX, logger *zap.Logger) *UserModule {
 	}
 }
 
-func (m *UserModule) RegisterRoutes(r *gin.RouterGroup, logger *zap.Logger) {
-	users := r.Group("/users")
+func (m *UserModule) RegisterRoutes(r *gin.RouterGroup, logger *zap.Logger, cfg *env.Config) {
+	users := r.Group("/users", middlewares.AuthMiddleware(logger, cfg))
 
 	users.POST("", middlewares.BindJSON[CreateUserRequest](logger), m.handler.CreateUser)
 	users.GET("", m.handler.ListUsers)

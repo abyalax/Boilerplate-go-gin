@@ -3,7 +3,7 @@ package users
 import (
 	"net/http"
 
-	api "github.com/abyalax/Boilerplate-go-gin/src/conf/response"
+	api "github.com/abyalax/Boilerplate-go-gin/src/config/response"
 	httpBind "github.com/abyalax/Boilerplate-go-gin/src/http"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"

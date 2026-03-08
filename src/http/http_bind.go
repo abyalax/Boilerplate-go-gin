@@ -1,7 +1,7 @@
 package http
 
 import (
-	"github.com/abyalax/Boilerplate-go-gin/src/conf/logger"
+	"github.com/abyalax/Boilerplate-go-gin/src/config/logger"
 	"github.com/gin-gonic/gin"
 )
 

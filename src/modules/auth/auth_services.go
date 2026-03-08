@@ -2,27 +2,14 @@ package auth
 
 import (
 	"context"
-	"sync"
+	"time"
 
-	"github.com/abyalax/Boilerplate-go-gin/src/reject"
+	"github.com/abyalax/Boilerplate-go-gin/src/config/app"
+	"github.com/abyalax/Boilerplate-go-gin/src/config/env"
+	"github.com/abyalax/Boilerplate-go-gin/src/http"
+	"github.com/abyalax/Boilerplate-go-gin/src/utils"
+	"github.com/golang-jwt/jwt/v5"
 )
-
-// Simple in-memory user store for testing
-type userStore struct {
-	users map[string]bool // email -> exists
-	mu    sync.RWMutex
-}
-
-var globalUserStore = &userStore{
-	users: make(map[string]bool),
-}
-
-// ClearUserStore clears the in-memory user store (for testing)
-func ClearUserStore() {
-	globalUserStore.mu.Lock()
-	globalUserStore.users = make(map[string]bool)
-	globalUserStore.mu.Unlock()
-}
 
 type AuthService struct {
 	q *Queries
@@ -36,63 +23,63 @@ func NewAuthService(q *Queries) *AuthService {
 
 func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
 	user, err := s.q.GetUserByEmail(ctx, req.Email)
+	cfg, _ := env.Load()
 	if err != nil {
-		return nil, reject.AuthEmailNotFound
+		return nil, app.Reject(http.AuthEmailNotFound, nil)
 	}
 
-	// Simple password check - in production, use bcrypt
-	if user.Password != req.Password {
-		return nil, reject.AuthInvalidPassword
+	if !utils.CheckPasswordHash(req.Password, user.Password) {
+		return nil, app.Reject(http.AuthInvalidPassword, nil)
 	}
 
-	token := "example token ya ini"
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"id":    user.ID,
+		"email": user.Email,
+		"iat":   now.Unix(),
+		"exp":   now.Add(cfg.JWT.TokenExpiry).Unix(),
+	}
 
-	// Try to get user with permissions, but fallback to basic user info
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(cfg.JWT.Secret))
+	if err != nil {
+		return nil, app.Reject(http.JWTFailedGenerateToken, err)
+	}
+
 	userRole, err := s.q.GetUserWithPermissions(ctx, user.ID)
 	if err != nil {
-		// Fallback: create basic user response without permissions
-		return &LoginResponse{
-			User: UserRolePermission{
-				Name:        user.Name,
-				Email:       user.Email,
-				Roles:       []Role{},
-				Permissions: []Permission{},
-			},
-			Token: token,
-		}, nil
+		return nil, err
 	}
 
 	return &LoginResponse{
 		User:  *MapUser(userRole),
-		Token: token,
+		Token: tokenString,
 	}, nil
 }
 
 func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*RegisterResponse, error) {
-	// Check if user already exists in our in-memory store
-	globalUserStore.mu.RLock()
-	_, exists := globalUserStore.users[req.Email]
-	globalUserStore.mu.RUnlock()
 
-	if exists {
-		return nil, reject.AuthEmailAlreadyExists
+	_, err := s.q.GetUserByEmail(ctx, req.Email)
+	if err == nil {
+		return nil, app.Reject(http.AuthEmailAlreadyExists, nil)
 	}
 
-	// Add user to our in-memory store
-	globalUserStore.mu.Lock()
-	globalUserStore.users[req.Email] = true
-	globalUserStore.mu.Unlock()
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return nil, err
+	}
 
-	token := "example token ya ini"
+	user, err := s.q.CreateUser(ctx, CreateUserParams{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: hashedPassword,
+	})
 
-	// Return a basic user response
 	return &RegisterResponse{
-		User: UserRolePermission{
-			Name:        req.Name,
-			Email:       req.Email,
-			Roles:       []Role{},
-			Permissions: []Permission{},
+		User: User{
+			ID:    user.ID,
+			Name:  req.Name,
+			Email: req.Email,
 		},
-		Token: token,
 	}, nil
 }

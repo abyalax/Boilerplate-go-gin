@@ -5,23 +5,18 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/abyalax/Boilerplate-go-gin/src/bootstrap"
-	"github.com/joho/godotenv"
+	"github.com/abyalax/Boilerplate-go-gin/src/config/env"
 )
 
 func main() {
-	godotenv.Load()
-
-	// Get configuration from environment
-	dbURL := getEnv("DATABASE_URL", "")
-	port := getEnvInt("PORT", 4000)
+	cfg, err := env.Load()
 
 	// Initialize application
-	app, err := bootstrap.NewApp(dbURL, port)
+	app, err := bootstrap.NewApp(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize app: %v\n", err)
 		os.Exit(1)
@@ -48,20 +43,4 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to stop app: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-// getEnv gets an environment variable with a default value
-func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return strings.TrimSpace(value)
-	}
-	return defaultValue
-}
-
-// getEnvInt gets an environment variable as integer with a default value
-func getEnvInt(key string, defaultValue int) int {
-	if value, exists := os.LookupEnv(key); exists {
-		fmt.Sscanf(strings.TrimSpace(value), "%d", &defaultValue)
-	}
-	return defaultValue
 }

@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/abyalax/Boilerplate-go-gin/src/db"
-	"github.com/abyalax/Boilerplate-go-gin/src/reject"
+	"github.com/abyalax/Boilerplate-go-gin/src/http"
 )
 
 type UserService struct {
@@ -20,7 +20,7 @@ func NewUserService(q *Queries) *UserService {
 func (s *UserService) CreateUser(ctx context.Context, req *CreateUserRequest) (int32, error) {
 	_, err := s.q.GetUserByEmail(ctx, req.Email)
 	if err == nil {
-		return 0, reject.UserAlreadyExists
+		return 0, http.UserAlreadyExists
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, err
@@ -35,7 +35,7 @@ func (s *UserService) CreateUser(ctx context.Context, req *CreateUserRequest) (i
 	createdUser, err := s.q.CreateUser(ctx, arg)
 	if err != nil {
 		if db.IsUniqueViolation(err) {
-			return 0, reject.UserAlreadyExists
+			return 0, http.UserAlreadyExists
 		}
 		return 0, err
 	}
@@ -48,7 +48,7 @@ func (s *UserService) GetUser(ctx context.Context, id int32) (*UserDTO, error) {
 	u, err := s.q.GetUserByID(ctx, int32(id))
 	if err != nil {
 		if db.IsNoRows(err) {
-			return nil, reject.UserNotFound
+			return nil, http.UserNotFound
 		}
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (s *UserService) UpdateUser(ctx context.Context, id int32, req *UpdateUserR
 	existing, err := s.q.GetUserByID(ctx, int32(id))
 	if err != nil {
 		if db.IsNoRows(err) {
-			return nil, reject.UserNotFound
+			return nil, http.UserNotFound
 		}
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (s *UserService) UpdateUser(ctx context.Context, id int32, req *UpdateUserR
 		if email != existing.Email {
 			_, err := s.q.GetUserByEmail(ctx, email)
 			if err == nil {
-				return nil, reject.UserAlreadyExists
+				return nil, http.UserAlreadyExists
 			}
 			if !errors.Is(err, sql.ErrNoRows) {
 				return nil, err
@@ -119,7 +119,7 @@ func (s *UserService) DeleteUser(ctx context.Context, id int32) error {
 	_, err := s.q.GetUserByID(ctx, id)
 	if err != nil {
 		if db.IsNoRows(err) {
-			return reject.UserNotFound
+			return http.UserNotFound
 		}
 		return err
 	}

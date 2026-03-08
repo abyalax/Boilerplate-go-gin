@@ -19,8 +19,7 @@ type LoginResponse struct {
 }
 
 type RegisterResponse struct {
-	User  UserRolePermission `json:"user"`
-	Token string             `json:"token"`
+	User User `json:"user"`
 }
 
 type GetUserAuthRow struct {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/abyalax/Boilerplate-go-gin/src/config/env"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -21,9 +22,10 @@ func GetLogger() *zap.Logger {
 }
 
 func newLogger() *zap.Logger {
-	env := os.Getenv("APP_ENV")
 
-	if env == "production" {
+	env, _ := env.Load()
+
+	if env.Environment == "production" {
 		logger, _ := zap.NewProduction()
 		return logger
 	}

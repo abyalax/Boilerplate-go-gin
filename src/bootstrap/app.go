@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abyalax/Boilerplate-go-gin/src/conf/logger"
+	"github.com/abyalax/Boilerplate-go-gin/src/config/env"
+	"github.com/abyalax/Boilerplate-go-gin/src/config/logger"
 	middlewares "github.com/abyalax/Boilerplate-go-gin/src/middleware"
 	"github.com/abyalax/Boilerplate-go-gin/src/modules/auth"
 	users "github.com/abyalax/Boilerplate-go-gin/src/modules/users"
@@ -24,12 +25,12 @@ type App struct {
 }
 
 // NewApp init the application
-func NewApp(dbURL string, port int) (*App, error) {
+func NewApp(cfg *env.Config) (*App, error) {
 	// Initialize logger
 	logger := logger.GetLogger()
 
 	// Init database
-	db, err := initDatabase(logger, dbURL)
+	db, err := initDatabase(logger, cfg.GetDatabaseURL())
 	if err != nil {
 		logger.Fatal("failed to initialize database", zap.Error(err))
 	}
@@ -40,13 +41,14 @@ func NewApp(dbURL string, port int) (*App, error) {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
+	router.Use(middlewares.RateLimiter(logger))
 	router.Use(middlewares.LoggingMiddleware(logger))
 	router.Use(middlewares.RecoveryMiddleware(logger))
-	router.Use(middlewares.ErrorHandler(logger))
+	router.Use(middlewares.ErrorMiddleware(logger))
 
 	v1 := router.Group("/api/v1")
 
-	userModule.RegisterRoutes(v1, logger)
+	userModule.RegisterRoutes(v1, logger, cfg)
 	authModule.RegisterRoutes(v1, logger)
 
 	v1.GET("/health", func(c *gin.Context) {
@@ -62,12 +64,14 @@ func NewApp(dbURL string, port int) (*App, error) {
 	})
 
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", port),
+		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
+	addr := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
+	logger.Info("Application running on " + addr)
 
 	return &App{
 		server: server,
@@ -78,7 +82,6 @@ func NewApp(dbURL string, port int) (*App, error) {
 
 // Start starts the application
 func (a *App) Start() error {
-	a.logger.Info("Application running on http://localhost:4000")
 	return a.server.ListenAndServe()
 }
 
